@@ -24,7 +24,7 @@
 """
 from importlib.metadata import entry_points as _entry_points
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import memcache
 import logging
