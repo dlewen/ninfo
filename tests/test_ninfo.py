@@ -1,3 +1,15 @@
+"""
+Tests for ninfo core plugin loading, lazy initialization, and argument compatibility.
+Converted from nose-style yield tests to pytest parametrize for Python 3.10+ compatibility.
+
+@decision DEC-MOD-005
+@title Convert nose yield-based tests to pytest parametrize
+@status accepted
+@rationale pytest dropped support for nose-style yield tests. Converted to
+           pytest.mark.parametrize which is the idiomatic modern approach.
+           Behavior is identical — same cases, same assertions.
+"""
+import pytest
 import ninfo
 from tests.common import Wrapper
 
@@ -43,19 +55,15 @@ def test_plugin_lazy_init():
 
     assert res == "AAAAAAAAAAA"
 
-def test_plugin_compatible_types():
+@pytest.mark.parametrize("arg,expected", [
+    ("example.com", True),
+    # plug_a has types=['hostname'] only, so IP args are incompatible regardless of remote flag
+    ("1.2.3.4", False),
+    ("00:11:22:33:44:55", False),
+])
+def test_plugin_compatible_types(arg, expected):
     test_plugins = {
         "a": Wrapper("tests.plug_a"),
     }
-    n=ninfo.Ninfo(plugin_modules=test_plugins)
-
-    cases = [
-        ("example.com", True),
-        ("1.2.3.4", True),
-        ("00:11:22:33:44:55", False),
-    ]
-    for arg, expected in cases:
-        yield _plugin_compatible_type_case, n, arg, expected
-
-def _plugin_compatible_type_case(n, arg, expected):
+    n = ninfo.Ninfo(plugin_modules=test_plugins)
     assert n.compatible_argument("a", arg) == expected

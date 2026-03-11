@@ -1,4 +1,28 @@
-from pkg_resources import iter_entry_points
+"""
+@decision DEC-MOD-001
+@title Replace pkg_resources with importlib.metadata
+@status accepted
+@rationale pkg_resources is deprecated and emits DeprecationWarning on Python 3.12+.
+           importlib.metadata is stdlib since Python 3.8 with a stable API.
+
+@decision DEC-MOD-002
+@title Replace getargspec with inspect.signature
+@status accepted
+@rationale getargspec was removed in Python 3.11. inspect.signature is the modern API.
+           Since get_info is a bound method, signature().parameters excludes self,
+           so the arity check changes from == 3 to == 2.
+
+@decision DEC-MOD-003
+@title Remove ConfigParser Python 2 shim
+@status accepted
+@rationale Python 2 is EOL. configparser (lowercase) is the Python 3 standard module.
+
+@decision DEC-MOD-004
+@title Replace optparse with argparse
+@status accepted
+@rationale optparse is soft-deprecated since Python 3.2. argparse is the replacement.
+"""
+from importlib.metadata import entry_points as _entry_points
 
 __version__ = "1.0.0"
 
@@ -9,24 +33,27 @@ logger = logging.getLogger("ninfo")
 
 import os
 
-try:
-    import ConfigParser
-except ImportError:
-    import configparser as ConfigParser
+import configparser
 
 import json
 
 from mako.template import Template
 
-try:
-    from inspect import getargspec
-except ImportError:
-    from inspect import getfullargspec as getargspec
+from inspect import signature
 
 from inspect import getsourcefile
 
 from ninfo import util
 import IPy
+
+
+def _get_entry_points(group):
+    """Compatible entry_points(group=...) for Python 3.10+."""
+    eps = _entry_points()
+    if hasattr(eps, "select"):  # Python 3.12+
+        return eps.select(group=group)
+    # Python 3.10-3.11: returns a dict
+    return eps.get(group, [])
 
 
 def clean_cache_key(s):
@@ -43,7 +70,7 @@ class PluginInitError(PluginError):
     pass
 
 
-class PluginBase(object):
+class PluginBase:
     cache_timeout = 60 * 60
     local = True
     remote = True
@@ -159,7 +186,7 @@ class Ninfo:
             self.plugin_modules = plugin_modules
         else:
             self.plugin_modules = {}
-            for ep in iter_entry_points(group="ninfo.plugin"):
+            for ep in _get_entry_points("ninfo.plugin"):
                 self.plugin_modules[ep.name] = ep
 
         self.read_config(config_file)
@@ -168,7 +195,7 @@ class Ninfo:
         return plugin in self.plugin_modules
 
     def read_config(self, config_file):
-        cp = ConfigParser.ConfigParser()
+        cp = configparser.ConfigParser()
         if config_file:
             cp.read([config_file])
         elif os.getenv("INFO_CONFIG_FILE"):
@@ -309,8 +336,11 @@ class Ninfo:
 
         try:
             plugin_obj.init()
-            get_info_args = len(getargspec(plugin_obj.get_info)[0])
-            if get_info_args == 3:
+            # Use inspect.signature on the bound method — self is excluded from parameters.
+            # A plugin supporting options has (arg, options) = 2 params.
+            # A plugin without options has (arg,) = 1 param.
+            get_info_args = len(signature(plugin_obj.get_info).parameters)
+            if get_info_args == 2:
                 # This plugin supports context.
                 ret = plugin_obj.get_info(arg, options)
             else:
@@ -385,27 +415,15 @@ def main():
     # requests logs stuff at level INFO
     logging.getLogger("requests.packages.urllib3").setLevel(logging.ERROR)
 
-    from optparse import OptionParser
+    from argparse import ArgumentParser
 
-    parser = OptionParser(usage="usage: %prog [options] [addresses]")
-    parser.add_option(
-        "-p",
-        "--plugin",
-        dest="plugins",
-        action="append",
-        help="The plugin to run",
-        default=None,
-    )
-    parser.add_option(
-        "-j",
-        "--json",
-        dest="json",
-        action="store_true",
-        help="Output json instead of rendering",
-        default=False,
-    )
-    parser.add_option("-l", "--list", dest="list", action="store_true", default=False)
-    (options, complete_args) = parser.parse_args()
+    parser = ArgumentParser(description="Plugin based information gathering library")
+    parser.add_argument("-p", "--plugin", dest="plugins", action="append", help="The plugin to run", default=None)
+    parser.add_argument("-j", "--json", dest="json", action="store_true", help="Output json instead of rendering", default=False)
+    parser.add_argument("-l", "--list", dest="list", action="store_true", default=False)
+    parser.add_argument("args", nargs="*", metavar="addresses")
+    options = parser.parse_args()
+    complete_args = options.args
 
     p = Ninfo()
     if options.list:

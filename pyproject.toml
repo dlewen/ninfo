@@ -12,24 +12,28 @@ authors = [{ name = "Justin Azoff", email = "justin.azoff@gmail.com" }, { name =
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 2",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
-keywords = ["ninfo", "search"] 
+keywords = ["ninfo", "search"]
 dependencies = [
     "Mako",
     "python-memcached",
     "ieeemac",
     "IPy",
 ]
-requires-python = ">=2.7"
+requires-python = ">=3.10"
 
 [project.optional-dependencies]
 dev = ["black", "bumpver", "isort", "pip-tools", "pytest"]
 splunk = ["splunk-sdk"]
 
 [project.urls]
-Homepage = "https://github.com/ninfo-py/ninfo"
+Homepage = "https://github.com/dlewen/ninfo"
 
 [project.scripts]
 ninfo = "ninfo:main"
@@ -45,4 +49,3 @@ push            = false
 [tool.bumpver.file_patterns]
 "pyproject.toml" = ['current_version = "{version}"', 'version = "{version}"']
 "ninfo/__init__.py" = ['^__version__ = "{version}"$']
-"setup.py" = ["version='{version}'"]
